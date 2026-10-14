@@ -1,5 +1,7 @@
 # MissionMind 🚀
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gsai9582/missionmind)
+
 **Evidence-Grounded Space Mission Anomaly & Knowledge Intelligence Platform**
 
 MissionMind helps planetary scientists detect, explain, and cross-reference anomalous observations from the Mars 2020 / Perseverance rover's MEDA instrument. Every score is computed by code; the LLM only explains structured results and must cite its evidence.
