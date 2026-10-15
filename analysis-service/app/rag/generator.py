@@ -10,10 +10,13 @@ Rules enforced:
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import List, Optional
 
 from openai import OpenAI
+
+logger = logging.getLogger("missionmind.rag")
 
 from app.rag.retriever import RetrievalResult
 
@@ -175,13 +178,12 @@ class RAGGenerator:
             return explanation, status
 
         except Exception as e:
-            return (
-                f"Error generating explanation: {str(e)}. "
-                f"Anomaly score: {anomaly_score}, "
-                f"Detected: {anomaly_detected}. "
-                f"Reasons: {'; '.join(anomaly_reasons)}",
-                "insufficient_evidence"
+            logger.warning(f"OpenAI call failed ({e}). Using structured evidence synthesis.")
+            fallback = self._fallback_explanation(
+                anomaly_detected, anomaly_score, anomaly_reasons,
+                similar_events, evidence_chunks, status
             )
+            return fallback, status
 
     def _fallback_explanation(
         self,
