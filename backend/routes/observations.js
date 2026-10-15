@@ -102,11 +102,27 @@ router.post('/:id/analyze', authMiddleware, async (req, res) => {
       pressure: observation.pressure,
     };
 
-    let analysisUrl = (process.env.ANALYSIS_SERVICE_URL || 'http://127.0.0.1:8000').trim().replace(/\/+$/, '');
+    let analysisUrl = process.env.ANALYSIS_SERVICE_URL ? process.env.ANALYSIS_SERVICE_URL.trim() : '';
+
+    // Auto-detect production environment (Render sets RENDER=true or PORT=10000)
+    const isProd = process.env.RENDER || process.env.NODE_ENV === 'production' || process.env.PORT;
+
+    if (!analysisUrl || analysisUrl.includes('localhost') || analysisUrl.includes('127.0.0.1')) {
+      analysisUrl = isProd ? 'https://missionmind-analysis.onrender.com' : 'http://127.0.0.1:8000';
+    }
+
+    // Render free instances cannot resolve internal hostnames like "missionmind-analysis:10000"
+    if (analysisUrl.includes('missionmind-analysis') && !analysisUrl.includes('.onrender.com')) {
+      analysisUrl = 'https://missionmind-analysis.onrender.com';
+    }
+
     if (!analysisUrl.startsWith('http://') && !analysisUrl.startsWith('https://')) {
       analysisUrl = `https://${analysisUrl}`;
     }
-    const pythonRes = await axios.post(`${analysisUrl}/analyze`, payload);
+    analysisUrl = analysisUrl.replace(/\/+$/, '');
+
+    console.log(`[analyze] Forwarding to Python Analysis Service: ${analysisUrl}/analyze`);
+    const pythonRes = await axios.post(`${analysisUrl}/analyze`, payload, { timeout: 60000 });
     
     // Save the result
     observation.analysis_result = pythonRes.data;

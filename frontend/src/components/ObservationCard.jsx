@@ -20,7 +20,8 @@ export default function ObservationCard({ obs, viewMode = 'explorer' }) {
       setExpanded(true);
     } catch (error) {
       console.error('Failed to analyze:', error);
-      alert('Failed to run analysis. Make sure the Python analysis service is running on port 8000.');
+      const detail = error.response?.data?.details || error.response?.data?.error || error.message || 'Unknown error';
+      alert(`Analysis failed: ${detail}`);
     } finally {
       setAnalyzing(false);
     }

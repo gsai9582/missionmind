@@ -45,10 +45,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: ANALYSIS_SERVICE_URL
-        fromService:
-          type: web
-          name: missionmind-analysis
-          property: host
+        value: https://missionmind-analysis.onrender.com
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 3. React / Vite Frontend (Free Static Site with Global CDN)
