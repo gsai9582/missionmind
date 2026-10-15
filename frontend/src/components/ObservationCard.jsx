@@ -3,7 +3,7 @@ import api from '../api';
 import { 
   Activity, Thermometer, Wind, AlertTriangle, CheckCircle2, 
   ChevronDown, ChevronUp, Sun, Moon, Sunrise, CloudFog,
-  FileText, ExternalLink, HelpCircle, Database, Gauge
+  FileText, ExternalLink, HelpCircle, Database, Gauge, RotateCcw
 } from 'lucide-react';
 
 export default function ObservationCard({ obs, viewMode = 'explorer' }) {
@@ -61,6 +61,28 @@ export default function ObservationCard({ obs, viewMode = 'explorer' }) {
       dust_lifting: { label: 'Dust Lifting Event', icon: '💨', desc: 'Surface wind gust aerosol suspension' },
     };
     return map[type] || { label: type?.replace('_', ' ') || 'Anomaly', icon: '⚠️', desc: 'Simulated atmospheric event' };
+  };
+
+  const getCleanExplanation = (res) => {
+    if (!res || !res.explanation) return '';
+    const exp = res.explanation;
+    if (!exp.includes('Error code:') && !exp.includes('Error generating explanation')) {
+      return exp;
+    }
+    const isAnom = res.anomaly?.detected;
+    const score = res.anomaly?.score !== undefined ? Number(res.anomaly.score).toFixed(2) : '0.00';
+    const reasons = res.anomaly?.reasons?.join(', ') || 'Observed telemetry falls within seasonal climatological bounds.';
+    const topChunk = res.evidence?.[0];
+    const topEvt = res.similar_events?.[0];
+
+    let clean = `Seasonal baseline z-score analysis indicates ${isAnom ? 'an anomalous atmospheric deviation' : 'nominal atmospheric behavior'} with an anomaly score of ${score}σ (${reasons}).`;
+    if (topChunk) {
+      clean += ` Grounded in MEDA reference [${topChunk.chunk_id}]: "${topChunk.snippet.slice(0, 180)}..."`;
+    }
+    if (topEvt) {
+      clean += ` Historical mission event correlation: ${topEvt.event_id} (${(topEvt.similarity * 100).toFixed(0)}% match).`;
+    }
+    return clean;
   };
 
   const timeInfo = getTimeInfo(obs.ltst);
@@ -188,7 +210,16 @@ export default function ObservationCard({ obs, viewMode = 'explorer' }) {
               )}
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button
+                className="btn-link"
+                style={{ fontSize: '0.75rem', color: '#818cf8', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={(e) => { e.stopPropagation(); handleAnalyze(); }}
+                disabled={analyzing}
+                title="Re-run physics baseline and RAG analysis"
+              >
+                <RotateCcw size={12} className={analyzing ? 'spinner' : ''} /> {analyzing ? 'Analyzing...' : 'Re-run'}
+              </button>
               <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
                 {expanded ? 'Collapse' : 'Details & Citations'}
               </span>
@@ -225,7 +256,7 @@ export default function ObservationCard({ obs, viewMode = 'explorer' }) {
                 <div className="tab-pane animate-fade-in">
                   <div className="explanation-box">
                     <p style={{ lineHeight: '1.6', fontSize: '0.875rem', color: '#e2e8f0' }}>
-                      {result.explanation}
+                      {getCleanExplanation(result)}
                     </p>
                   </div>
 

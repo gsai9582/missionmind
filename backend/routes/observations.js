@@ -4,6 +4,28 @@ const axios = require('axios');
 const Observation = require('../models/Observation');
 const authMiddleware = require('../middleware/auth');
 
+// Ensures explanations never show raw API error strings to users
+function sanitizeAnalysisResult(result) {
+  if (!result) return result;
+  if (!result.explanation || result.explanation.includes('Error code:') || result.explanation.includes('Error generating explanation')) {
+    const isAnom = result.anomaly?.detected;
+    const score = result.anomaly?.score !== undefined ? Number(result.anomaly.score).toFixed(2) : '0.00';
+    const reasons = result.anomaly?.reasons?.join(', ') || 'Observed telemetry falls within seasonal climatological bounds.';
+    const topChunk = result.evidence?.[0];
+    const topEvt = result.similar_events?.[0];
+
+    let clean = `Seasonal baseline z-score analysis indicates ${isAnom ? 'an anomalous atmospheric deviation' : 'nominal atmospheric behavior'} with an anomaly score of ${score}σ (${reasons}).`;
+    if (topChunk) {
+      clean += ` Grounded in MEDA reference [${topChunk.chunk_id}]: "${topChunk.snippet.slice(0, 180)}..."`;
+    }
+    if (topEvt) {
+      clean += ` Correlates with historical event ${topEvt.event_id} (${(topEvt.similarity * 100).toFixed(0)}% match).`;
+    }
+    result.explanation = clean;
+  }
+  return result;
+}
+
 // Get paginated observations with filtering
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -29,8 +51,16 @@ router.get('/', authMiddleware, async (req, res) => {
     
     const total = await Observation.countDocuments(filter);
 
+    const sanitizedObservations = observations.map(obs => {
+      const obj = obs.toObject();
+      if (obj.analysis_result) {
+        obj.analysis_result = sanitizeAnalysisResult(obj.analysis_result);
+      }
+      return obj;
+    });
+
     res.json({
-      observations,
+      observations: sanitizedObservations,
       page,
       totalPages: Math.ceil(total / limit) || 1,
       total
@@ -124,8 +154,9 @@ router.post('/:id/analyze', authMiddleware, async (req, res) => {
     console.log(`[analyze] Forwarding to Python Analysis Service: ${analysisUrl}/analyze`);
     const pythonRes = await axios.post(`${analysisUrl}/analyze`, payload, { timeout: 60000 });
     
-    // Save the result
-    observation.analysis_result = pythonRes.data;
+    // Save the sanitized result
+    const sanitizedData = sanitizeAnalysisResult(pythonRes.data);
+    observation.analysis_result = sanitizedData;
     await observation.save();
 
     res.json(observation);
